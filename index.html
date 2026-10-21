@@ -6,6 +6,8 @@
   <title>3학년 과학 프로젝트 | 세상을 움직이는 소리 탐정단 포트폴리오</title>
   <!-- Supabase JS Client v2 CDN -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <!-- 로컬 설정 로드 (Git 무시됨) -->
+  <script src="config.js"></script>
   <style>
     :root {
       --primary: #4F46E5;
@@ -791,7 +793,7 @@
 
           <div class="form-group">
             <label class="form-label">작품 이름 및 선택한 대본/원리 소개</label>
-            <input type="text" id="projectLinkInput" placeholder="예: 장면 1 빗소리 연출 / 종이컵 빗소리 쉐이커" style="width: 100%;" onchange="syncToCloud(false)">
+            <input type="text" id="projectLinkInput" placeholder="예: 장면 1 빗소리 연출 / 종이컵 빗소리 쉐이커" style="width: 100%;" onchange="syncToCloudWithRetry(false)">
           </div>
 
           <div class="form-group">
@@ -855,7 +857,7 @@
           <div class="card-title">📖 나의 소리 탐구 포트폴리오 북</div>
           <div style="display: flex; gap: 8px;">
             <button class="btn btn-primary btn-sm" onclick="window.print()">🖨️ 포트폴리오 인쇄 / PDF 저장</button>
-            <button class="btn btn-accent btn-sm" onclick="syncToCloud(true)">☁️ 클라우드에 지금 저장하기</button>
+            <button class="btn btn-accent btn-sm" onclick="syncToCloudWithRetry(true)">☁️ 클라우드에 지금 저장하기</button>
           </div>
         </div>
         <div id="feedbackBanner"></div>
@@ -936,8 +938,8 @@
     // ==========================================
     // 🌐 Supabase 클라우드 설정
     // ==========================================
-    const SUPABASE_URL = "https://ouvfoiokkbejgcggdvma.supabase.co";
-    const SUPABASE_ANON_KEY = "sb_publishable_ahZJ8TgTkzLrvYtEkQXsVQ_21WU2qJM";
+    const SUPABASE_URL = window.SUPABASE_CONFIG?.URL || "https://ouvfoiokkbejgcggdvma.supabase.co";
+    const SUPABASE_ANON_KEY = window.SUPABASE_CONFIG?.ANON_KEY || "sb_publishable_ahZJ8TgTkzLrvYtEkQXsVQ_21WU2qJM";
     let sbClient = null;
 
     if (window.supabase) {
@@ -946,6 +948,52 @@
       } catch (err) {
         console.error("Failed to initialize Supabase client:", err);
       }
+    }
+
+    // ==========================================
+    // 🛡️ Supabase 에러 코드 → 사용자 친화 메시지 매핑 (P0-3)
+    // ==========================================
+    function getSupabaseErrorMessage(error) {
+      if (!error) return '알 수 없는 오류';
+      const code = error.code;
+      const msg = error.message || '';
+      
+      const errorMap = {
+        // PostgREST 에러 코드
+        'PGRST116': '데이터를 찾을 수 없습니다. (테이블 또는 레코드 없음)',
+        'PGRST204': '데이터를 찾을 수 없습니다. (조건 불일치)',
+        'PGRST205': '테이블이 존재하지 않습니다. 관리자에게 문의하세요.',
+        'PGRST301': '권한이 없습니다. RLS 정책을 확인하세요.',
+        
+        // PostgreSQL 에러 코드
+        '23505': '중복된 데이터입니다. (고유 키 위반)',
+        '23503': '참조된 데이터가 없습니다. (외래 키 위반)',
+        '23514': '데이터 형식이 올바르지 않습니다. (체크 제약 위반)',
+        '22001': '데이터가 너무 깁니다. (길이 초과)',
+        '22003': '숫자 범위를 초과했습니다.',
+        '42P01': '테이블이 존재하지 않습니다.',
+        '42703': '컬럼이 존재하지 않습니다.',
+        '08006': '데이터베이스 연결이 끊어졌습니다.',
+        '08001': '데이터베이스에 연결할 수 없습니다.',
+        '53300': '데이터베이스 연결이 너무 많습니다. 잠시 후 다시 시도하세요.',
+        '57014': '요청 시간이 초과되었습니다. 다시 시도하세요.',
+        
+        // Supabase Auth/Realtime 관련
+        'JWT_EXPIRED': '인증이 만료되었습니다. 페이지를 새로고침하세요.',
+        'INVALID_API_KEY': 'API 키가 유효하지 않습니다. 관리자에게 문의하세요.',
+      };
+      
+      if (code && errorMap[code]) {
+        return errorMap[code];
+      }
+      
+      // 코드 매칭 안 되면 원본 메시지 일부만 추출
+      if (msg) {
+        // 너무 긴 메시지 자르기
+        return msg.length > 100 ? msg.slice(0, 100) + '...' : msg;
+      }
+      
+      return `오류 발생 (코드: ${code || 'unknown'})`;
     }
 
     // ==========================================
@@ -1233,7 +1281,7 @@
             try { data = JSON.parse(localStorage.getItem(key)) || {}; } catch(e){}
             data.projectAudio = recordedAudioBase64;
             localStorage.setItem(key, JSON.stringify(data));
-            await syncToCloud(false);
+            await syncToCloudWithRetry(false);
             showToast('🎙️ 소리 녹음이 성공적으로 저장되었습니다!');
           };
           reader.readAsDataURL(audioBlob);
@@ -1290,7 +1338,7 @@
       const linkInput = document.getElementById('projectLinkInput');
       linkInput.value = names[num - 1];
       showToast(`'${names[num - 1]}' 대본이 선택되었습니다!`);
-      syncToCloud(false);
+      syncToCloudWithRetry(false);
     }
 
     // DIY 설계도 선택 시 자동 입력
@@ -1298,7 +1346,7 @@
       const linkInput = document.getElementById('projectLinkInput');
       linkInput.value = (linkInput.value ? linkInput.value + ' / ' : '') + `[제작] ${diyName}`;
       showToast(`'${diyName}' 설계도가 선택되었습니다!`);
-      syncToCloud(false);
+      syncToCloudWithRetry(false);
     }
 
     // ==========================================
@@ -1328,7 +1376,7 @@
       if (sbClient) {
         try {
           const { data: cloudData, error } = await sbClient
-            .from('263과학3단원소리')
+            .from('sound_portfolio_263')
             .select('*')
             .eq('id', studentId)
             .maybeSingle();
@@ -1351,8 +1399,26 @@
             };
             localStorage.setItem(getStudentStorageKey(), JSON.stringify(data));
             statusBadge.textContent = '🟢 클라우드 데이터 동기화 완료';
+            
+            // 🔴 P1-2: 기존 데이터와 이름 불일치 시 강제 재로그인 유도
             if (data.name && isLoggedIn && data.name.trim() && data.name.trim() !== loggedIdentity.name) {
-              statusBadge.textContent = '⚠️ 이 번호에 저장된 이름(' + data.name + ')과 입력한 이름이 다릅니다. 본인 번호가 맞는지 꼭 확인하세요!';
+              const confirmed = confirm(
+                '⚠️ 이 번호(' + studentId + ')에는 이미 \'' + data.name + '\' 님의 데이터가 저장되어 있습니다.\n\n' +
+                '현재 로그인한 이름: \'' + loggedIdentity.name + '\'\n\n' +
+                '본인 데이터가 맞으면 [확인]을, 번호가 틀렸다면 [취소]를 눌러 다시 로그인하세요.'
+              );
+              if (!confirmed) {
+                // 강제 로그아웃 및 로그인 화면으로 복귀
+                isLoggedIn = false;
+                loggedIdentity = { gradeClass: null, num: null, name: '' };
+                document.getElementById('loginOverlay').style.display = 'flex';
+                document.getElementById('loginError').textContent = '이름 불일치로 다시 로그인해 주세요.';
+                updateLockBadge();
+                statusBadge.textContent = '🔓 로그인 필요: 본인 번호와 이름으로 다시 로그인하세요.';
+                return; // 데이터 로드 중단
+              }
+              // 확인 시: 클라우드 이름 그대로 사용 (덮어쓰기 방지)
+              statusBadge.textContent = '✅ 본인 확인됨: 기존 데이터(\'' + data.name + '\')를 불러옵니다.';
             }
           } else if (error && error.code === 'PGRST205') {
             statusBadge.textContent = '🟡 로컬 안전 모드 (Supabase에 테이블 생성 필요)';
@@ -1476,9 +1542,51 @@
     }
 
     // ==========================================
-    // ☁️ 즉시 동기화 (Supabase + LocalStorage)
+    // 🏥 Supabase 연결 헬스체크 + 지수 백오프 재시도 (P1-1)
     // ==========================================
-    async function syncToCloud(showToastMsg = true) {
+    async function checkSupabaseHealth() {
+      if (!sbClient) return { healthy: false, reason: 'Client not initialized' };
+      try {
+        // 가벼운 헬스체크: 단일 레코드 조회 (limit 1)
+        const { error } = await sbClient
+          .from('sound_portfolio_263')
+          .select('id')
+          .limit(1);
+        if (error) return { healthy: false, reason: getSupabaseErrorMessage(error) };
+        return { healthy: true };
+      } catch (err) {
+        return { healthy: false, reason: getSupabaseErrorMessage(err) };
+      }
+    }
+
+    async function syncToCloudWithRetry(showToastMsg = true, maxRetries = 3) {
+      // 상태 배지 미리 가져오기 (재시도 메시지 표시용)
+      const statusBadge = document.getElementById('saveStatusBadge');
+      
+      // 헬스체크 먼저 수행
+      const health = await checkSupabaseHealth();
+      if (!health.healthy) {
+        if (showToastMsg) showToast(`🏥 연결 확인 실패: ${health.reason}. 로컬 저장 후 나중에 동기화됩니다.`);
+        return false;
+      }
+
+      // 지수 백오프 재시도 로직
+      for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        const result = await syncToCloudSingleAttempt(showToastMsg && attempt === maxRetries);
+        if (result) return true; // 성공
+        
+        if (attempt < maxRetries) {
+          const delay = Math.min(1000 * Math.pow(2, attempt - 1), 5000); // 1s, 2s, 4s (최대 5초)
+          if (statusBadge) statusBadge.textContent = `🔄 재시도 ${attempt}/${maxRetries - 1}... (${delay}ms 후)`;
+          if (showToastMsg) showToast(`☁️ 동기화 실패. ${Math.round(delay/1000)}초 후 재시도... (${attempt}/${maxRetries - 1})`);
+          await new Promise(r => setTimeout(r, delay));
+        }
+      }
+      return false;
+    }
+
+    // 기존 단일 시도 로직 분리
+    async function syncToCloudSingleAttempt(showToastMsg = true) {
       if (!isLoggedIn) {
         if (showToastMsg) showToast('먼저 반·번호·이름으로 로그인해 주세요!');
         return false;
@@ -1530,19 +1638,36 @@
 
       if (sbClient) {
         try {
-          const { error } = await sbClient.from('263과학3단원소리').upsert(payload, { onConflict: 'id' });
+          // 🔴 P0-2: 학생명 충돌 시 저장 차단 (타인 데이터 덮어쓰기 방지)
+          const { data: existing, error: fetchError } = await sbClient
+            .from('sound_portfolio_263')
+            .select('student_name')
+            .eq('id', payload.id)
+            .maybeSingle();
+
+          if (!fetchError && existing && existing.student_name && existing.student_name.trim() !== name.trim()) {
+            statusBadge.textContent = '🚫 저장 차단: 다른 이름이 이미 등록되어 있습니다.';
+            showToast(`❌ 저장 실패: 이 번호에는 '${existing.student_name}' 님의 데이터가 있습니다. 본인 번호가 맞는지 선생님께 확인받으세요.`);
+            return false;
+          }
+
+          const { error } = await sbClient.from('sound_portfolio_263').upsert(payload, { onConflict: 'id' });
           if (!error) {
             statusBadge.textContent = `🟢 클라우드 저장 완료 (${new Date().toLocaleTimeString()})`;
             if (showToastMsg) showToast('☁️ 클라우드에 안전하게 저장되었습니다! (선생님 확인 가능)');
             return true;
           } else {
-            console.warn("Supabase upsert note:", error.message, error.code);
-            statusBadge.textContent = '⚠️ 클라우드 저장 실패: ' + (error.message || error.code) + ' (로컬에는 보관됨)';
-            if (showToastMsg) showToast('⚠️ 클라우드 전송 실패. 로컬에는 저장됐으니 인터넷 확인 후 다시 저장해 주세요.');
+            const friendlyMsg = getSupabaseErrorMessage(error);
+            console.warn("Supabase upsert error:", error.code, error.message);
+            statusBadge.textContent = '⚠️ ' + friendlyMsg + ' (로컬에는 보관됨)';
+            if (showToastMsg) showToast('⚠️ ' + friendlyMsg + '. 로컬에는 저장됐으니 인터넷 확인 후 다시 저장해 주세요.');
             return false;
           }
         } catch (err) {
-          console.error("Supabase upsert error:", err);
+          console.error("Supabase upsert exception:", err);
+          const friendlyMsg = getSupabaseErrorMessage(err);
+          statusBadge.textContent = '⚠️ ' + friendlyMsg + ' (로컬에는 보관됨)';
+          if (showToastMsg) showToast('⚠️ ' + friendlyMsg + '. 로컬에는 저장됐으니 인터넷 확인 후 다시 저장해 주세요.');
         }
       }
 
@@ -1575,7 +1700,7 @@
       }
       localStorage.setItem(key, JSON.stringify(data));
 
-      await syncToCloud(true);
+      await syncToCloudWithRetry(true);
       renderPortfolioSummary();
     }
 
@@ -1592,7 +1717,7 @@
       };
       localStorage.setItem(key, JSON.stringify(data));
 
-      await syncToCloud(true);
+      await syncToCloudWithRetry(true);
       renderPortfolioSummary();
     }
 
@@ -1619,7 +1744,7 @@
         data.projectLink = document.getElementById('projectLinkInput').value;
         localStorage.setItem(key, JSON.stringify(data));
 
-        await syncToCloud(true);
+        await syncToCloudWithRetry(true);
       };
       reader.readAsDataURL(file);
     }
@@ -1697,7 +1822,7 @@
               n.text = newTxt.trim();
               saveMindMapData();
               renderMindMap();
-              await syncToCloud(false);
+              await syncToCloudWithRetry(false);
             }
           }
         };
@@ -1750,7 +1875,7 @@
       if (draggedNode) {
         saveMindMapData();
         draggedNode = null;
-        await syncToCloud(false);
+        await syncToCloudWithRetry(false);
       }
       window.removeEventListener('mousemove', onDragNode);
       window.removeEventListener('mouseup', stopDragNode);
@@ -1807,7 +1932,7 @@
 
       saveMindMapData();
       renderMindMap();
-      await syncToCloud(false);
+      await syncToCloudWithRetry(false);
       showToast(`'${parentNode.text}'에 새 가지가 연결되었습니다! 🌿`);
     }
 
@@ -1840,7 +1965,7 @@
 
       saveMindMapData();
       renderMindMap();
-      await syncToCloud(false);
+      await syncToCloudWithRetry(false);
       showToast(`'${parentText}'에서 새 가지가 뻗어나왔습니다! 🌿`);
     }
 
@@ -1851,7 +1976,7 @@
         mindNodes = mindNodes.filter(n => n.id !== nodeId);
         saveMindMapData();
         renderMindMap();
-        await syncToCloud(false);
+        await syncToCloudWithRetry(false);
         showToast('노드가 삭제되었습니다.');
       }
     }
@@ -1861,7 +1986,7 @@
         mindNodes = JSON.parse(JSON.stringify(STUDENT_DEFAULT_MIND_NODES));
         saveMindMapData();
         renderMindMap();
-        await syncToCloud(true);
+        await syncToCloudWithRetry(true);
         showToast('생각 그물이 백지 상태로 초기화되었습니다.');
       }
     }
@@ -2025,6 +2150,11 @@
         if (!isLoggedIn) {
           document.getElementById('loginOverlay').style.display = 'flex';
         }
+        // 🔴 교사 뷰 나갈 때 Realtime 구독 정리 (메모리 누적/중복 방지)
+        if (sbClient && window._teacherRealtimeChannel) {
+          sbClient.removeChannel(window._teacherRealtimeChannel);
+          window._teacherRealtimeChannel = null;
+        }
       }
     }
 
@@ -2125,7 +2255,7 @@
       if (sbClient) {
         statusLabel.textContent = '🔄 데이터 불러오는 중...';
         try {
-          const { data, error } = await sbClient.from('263과학3단원소리').select('*');
+          const { data, error } = await sbClient.from('sound_portfolio_263').select('*');
           if (!error && data) {
             cloudStudentData = {};
             data.forEach(item => {
@@ -2148,17 +2278,47 @@
               };
             });
             statusLabel.textContent = `🟢 클라우드 실시간 동기화 (${data.length}명 수신)`;
+          } else if (error) {
+            const friendlyMsg = getSupabaseErrorMessage(error);
+            console.warn("Supabase fetch error:", error.code, error.message);
+            statusLabel.textContent = '🟡 ' + friendlyMsg + ' (로컬 기준)';
           } else {
-            statusLabel.textContent = '🟡 로컬 모드 (오프라인 저장소 기준)';
+            statusLabel.textContent = '🟡 데이터 없음 (로컬 모드)';
           }
         } catch (err) {
-          console.warn("Supabase fetch error:", err);
-          statusLabel.textContent = '🟡 로컬 저장소 기준 조회';
+          console.error("Supabase fetch exception:", err);
+          const friendlyMsg = getSupabaseErrorMessage(err);
+          statusLabel.textContent = '🟡 ' + friendlyMsg + ' (로컬 기준)';
         }
       } else {
         statusLabel.textContent = '🟡 오프라인 로컬 저장소 모드';
       }
       loadTeacherGrid();
+
+      // 🔴 Realtime 구독: 학생 데이터 변경 시 교사 대시보드 자동 갱신
+      if (sbClient) {
+        // 기존 구독 정리 (중복 방지)
+        if (window._teacherRealtimeChannel) {
+          sbClient.removeChannel(window._teacherRealtimeChannel);
+        }
+        window._teacherRealtimeChannel = sbClient.channel('teacher-dashboard')
+          .on('postgres_changes', {
+            event: '*',          // INSERT, UPDATE, DELETE 모두 수신
+            schema: 'public',
+            table: 'sound_portfolio_263'
+          }, (payload) => {
+            const record = payload.new;
+            if (record) {
+              // 로컬 캐시 갱신
+              cloudStudentData[record.id] = { ...cloudStudentData[record.id], ...record };
+              // 그리드 다시 그리기
+              loadTeacherGrid();
+              // 알림 토스트
+              showToast('🔄 실시간 업데이트: ' + (record.student_name || record.id));
+            }
+          })
+          .subscribe();
+      }
     }
 
     function countFilledLessons(lessons) {
@@ -2223,7 +2383,7 @@
       const at = new Date().toLocaleString();
       if (sbClient) {
         try {
-          const { error } = await sbClient.from('263과학3단원소리').update({ feedback_text: fb, feedback_at: at }).eq('id', currentModalStudentId);
+          const { error } = await sbClient.from('sound_portfolio_263').update({ feedback_text: fb, feedback_at: at }).eq('id', currentModalStudentId);
           if (error) { alert('피드백 저장 실패: ' + error.message); return; }
         } catch (err) {
           alert('피드백 저장 중 오류가 발생했습니다.');
@@ -2680,7 +2840,7 @@
       };
 
       localStorage.setItem(key, JSON.stringify(data));
-      await syncToCloud(showToastMsg);
+      await syncToCloudWithRetry(showToastMsg);
       if (showToastMsg) {
         showToast('🌱 선생님께 안전하게 저장되었어요! 참 잘했어요 🌟');
       }

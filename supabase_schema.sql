@@ -1,10 +1,10 @@
 -- ========================================================
 -- 3학년 2학기 과학 3단원 [소리의 성질] 포트폴리오 Supabase 테이블 생성 쿼리
--- 테이블 이름: 263과학3단원소리
+-- 테이블 이름: sound_portfolio_263
 -- ========================================================
 
 -- 1. 테이블 생성
-create table if not exists public."263과학3단원소리" (
+create table if not exists public.sound_portfolio_263 (
     id text primary key,                     -- 학생 식별자 (예: "3-1_1", "3-2_15")
     grade_class text not null,               -- 학급 (예: "3-1", "3-2", "3-3")
     student_num integer not null,            -- 번호 (1 ~ 30)
@@ -23,35 +23,35 @@ create table if not exists public."263과학3단원소리" (
     feedback_at text default ''              -- 피드백 저장 시각
 );
 
--- 2. 실시간 테이블 활성화 (선택 사항: Supabase Realtime)
-alter publication supabase_realtime add table public."263과학3단원소리";
+-- 2. 복합 인덱스 (교사 대시보드 필터링 성능)
+create index if not exists idx_sound_portfolio_class_num 
+  on public.sound_portfolio_263 (grade_class, student_num);
 
--- 3. RLS(Row Level Security) 활성화
-alter table public."263과학3단원소리" enable row level security;
+-- 3. 실시간 테이블 활성화 (Supabase Realtime)
+alter publication supabase_realtime add table public.sound_portfolio_263;
 
--- 4. 익명 학생 무설정(Zero-Configuration) 즉시 조회 및 저장 정책 (Policies)
+-- 4. RLS(Row Level Security) 활성화
+alter table public.sound_portfolio_263 enable row level security;
+
+-- 5. 익명 학생 무설정(Zero-Configuration) 즉시 조회 및 저장 정책 (Policies)
 -- (1) 조회 허용
 create policy "누구나 조회 가능"
-on public."263과학3단원소리"
+on public.sound_portfolio_263
 for select
 to anon, authenticated
 using (true);
 
 -- (2) 신규 저장 허용
 create policy "누구나 신규 저장 가능"
-on public."263과학3단원소리"
+on public.sound_portfolio_263
 for insert
 to anon, authenticated
 with check (true);
 
 -- (3) 수정/업데이트 허용
 create policy "누구나 수정 가능"
-on public."263과학3단원소리"
+on public.sound_portfolio_263
 for update
 to anon, authenticated
 using (true)
 with check (true);
-
--- 5. 기존 테이블에 피드백 컬럼 추가 (이미 생성된 경우)
-alter table public."263과학3단원소리" add column if not exists feedback_text text default '';
-alter table public."263과학3단원소리" add column if not exists feedback_at text default '';
