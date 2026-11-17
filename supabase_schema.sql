@@ -55,3 +55,10 @@ for update
 to anon, authenticated
 using (true)
 with check (true);
+
+-- (4) 삭제 허용 (교사용 대시보드 데이터 정리 및 학적 이동용)
+create policy "누구나 삭제 가능"
+on public.sound_portfolio_263
+for delete
+to anon, authenticated
+using (true);

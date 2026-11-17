@@ -1,5 +1,7 @@
 .DS_Store
 *.pdf
+!investgate/*.pdf
+!public/investgate/*.pdf
 .playwright-mcp/
 
 # 민감 정보 보호
