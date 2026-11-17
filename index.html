@@ -1416,7 +1416,7 @@
         const chip = document.getElementById(`chip-lesson-${l.num}`);
         if (chip) {
           const lItem = lessonsData[l.num];
-          if (lItem && (lItem.observation || lItem.lifeExample || lItem.thought || lItem.kwlK)) {
+          if (lItem && (lItem.observation || lItem.lifeExample || lItem.thought || lItem.kwlK || lItem.q1_place)) {
             chip.classList.add('filled');
           } else {
             chip.classList.remove('filled');
@@ -2767,8 +2767,8 @@
       if (!lessons) return 0;
       let count = 0;
       for (let i = 1; i <= 14; i++) {
-        const item = lessons[i];
-        if (item && (item.observation || item.lifeExample || item.thought || item.kwlK)) count++;
+        const item = lessons[i] || lessons[String(i)];
+        if (item && (item.observation || item.lifeExample || item.thought || item.kwlK || item.q1_place)) count++;
       }
       return count;
     }
