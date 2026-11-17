@@ -563,34 +563,20 @@
               <div>
                 <strong style="color: #312E81; font-size: 1.15rem;">[9차시 탐구 조사관: 소음 잡는 과학 수사대 자료실]</strong>
                 <p style="font-size: 0.85rem; color: #64748B; margin: 2px 0 0;">
-                  선생님이 준비한 3가지 탐구 자료(영상·인포그래픽·슬라이드)를 살펴보고 아래 워크시트를 작성해 보세요!
+                  선생님이 준비한 3가지 탐구 자료(인포그래픽·슬라이드·영상)를 살펴보고 아래 워크시트를 작성해 보세요!
                 </p>
               </div>
             </div>
             <!-- 자료 전환 탭 버튼 3종 -->
             <div style="display: flex; gap: 6px; flex-wrap: wrap;">
-              <button type="button" class="btn btn-sm btn-primary" id="btnInvestTabVideo" onclick="switchInvestTab('video')">🎬 1. 탐구 영상</button>
-              <button type="button" class="btn btn-sm btn-white" style="border:1px solid #CBD5E1;" id="btnInvestTabImg" onclick="switchInvestTab('img')">📸 2. 방음 인포그래픽</button>
-              <button type="button" class="btn btn-sm btn-white" style="border:1px solid #CBD5E1;" id="btnInvestTabSlide" onclick="switchInvestTab('slide')">📑 3. 방음 과학 슬라이드 (14장)</button>
+              <button type="button" class="btn btn-sm btn-primary" id="btnInvestTabImg" onclick="switchInvestTab('img')">📸 1. 방음 인포그래픽</button>
+              <button type="button" class="btn btn-sm btn-white" style="border:1px solid #CBD5E1;" id="btnInvestTabSlide" onclick="switchInvestTab('slide')">📑 2. 방음 과학 슬라이드 (14장)</button>
+              <button type="button" class="btn btn-sm btn-white" style="border:1px solid #CBD5E1;" id="btnInvestTabVideo" onclick="switchInvestTab('video')">🎬 3. 탐구 영상</button>
             </div>
           </div>
 
-          <!-- 자료 1: 동영상 뷰어 -->
-          <div id="investContentVideo" class="invest-tab-content">
-            <div style="background: #0F172A; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.15); max-width: 820px; margin: 0 auto;">
-              <div style="padding: 10px 14px; background: #1E293B; color: #F8FAFC; font-size: 0.9rem; font-weight: 700; display:flex; justify-content:space-between; align-items:center;">
-                <span>🎬 쉿! 소음 잡는 과학 수사대 탐구 영상</span>
-                <span style="font-size: 0.78rem; color: #94A3B8;">재생 버튼(▶)을 눌러 시청하세요</span>
-              </div>
-              <video id="investVideoPlayer" src="investgate/쉿!_소음_잡는_과학_수사대.mp4" controls playsinline style="width: 100%; max-height: 460px; display: block; background: #000;"></video>
-            </div>
-            <p style="text-align: center; font-size: 0.85rem; color: #475569; margin-top: 8px;">
-              💡 영상을 보며 소음이 생기는 이유와 소음을 줄이는 과학 수사대의 비법을 찾아보세요!
-            </p>
-          </div>
-
-          <!-- 자료 2: 인포그래픽 뷰어 -->
-          <div id="investContentImg" class="invest-tab-content" style="display: none;">
+          <!-- 자료 1: 인포그래픽 뷰어 -->
+          <div id="investContentImg" class="invest-tab-content">
             <div style="background: white; border: 1px solid #CBD5E1; border-radius: 12px; padding: 14px; text-align: center;">
               <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
                 <span style="font-size: 0.92rem; font-weight: 700; color: #1E293B;">📸 소음 잡는 집 안 방음 원리 (인포그래픽)</span>
@@ -603,7 +589,7 @@
             </div>
           </div>
 
-          <!-- 자료 3: 슬라이드 뷰어 (14장 카드뉴스) -->
+          <!-- 자료 2: 슬라이드 뷰어 (14장 카드뉴스) -->
           <div id="investContentSlide" class="invest-tab-content" style="display: none;">
             <div style="background: white; border: 1px solid #CBD5E1; border-radius: 12px; padding: 14px;">
               <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; flex-wrap: wrap; gap: 8px;">
@@ -621,6 +607,20 @@
                 <button type="button" class="btn btn-sm btn-primary" onclick="nextInvestSlide()">다음 슬라이드 ▶</button>
               </div>
             </div>
+          </div>
+
+          <!-- 자료 3: 동영상 뷰어 -->
+          <div id="investContentVideo" class="invest-tab-content" style="display: none;">
+            <div style="background: #0F172A; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.15); max-width: 820px; margin: 0 auto;">
+              <div style="padding: 10px 14px; background: #1E293B; color: #F8FAFC; font-size: 0.9rem; font-weight: 700; display:flex; justify-content:space-between; align-items:center;">
+                <span>🎬 쉿! 소음 잡는 과학 수사대 탐구 영상</span>
+                <span style="font-size: 0.78rem; color: #94A3B8;">재생 버튼(▶)을 눌러 시청하세요</span>
+              </div>
+              <video id="investVideoPlayer" src="investgate/쉿!_소음_잡는_과학_수사대.mp4" controls playsinline style="width: 100%; max-height: 460px; display: block; background: #000;"></video>
+            </div>
+            <p style="text-align: center; font-size: 0.85rem; color: #475569; margin-top: 8px;">
+              💡 영상을 보며 소음이 생기는 이유와 소음을 줄이는 과학 수사대의 비법을 찾아보세요!
+            </p>
           </div>
         </div>
 
@@ -1527,6 +1527,8 @@
         if (!isLesson9) {
           const v = document.getElementById('investVideoPlayer');
           if (v && !v.paused) v.pause();
+        } else {
+          switchInvestTab('img');
         }
       }
 
