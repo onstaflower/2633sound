@@ -1105,6 +1105,24 @@
             </div>
           </div>
         </div>
+
+        <!-- 🧠 교사용 마인드맵 확대 뷰어 모달 -->
+        <div id="teacherMindmapModal" style="display:none; position:fixed; inset:0; z-index:3100; background:rgba(15,23,42,0.85); align-items:center; justify-content:center; padding:16px;" onclick="closeTeacherMindmapModal()">
+          <div style="position:relative; width:95vw; max-width:1150px; max-height:92vh; background:white; border-radius:14px; padding:18px; display:flex; flex-direction:column; box-shadow:0 12px 30px rgba(0,0,0,0.35);" onclick="event.stopPropagation()">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; border-bottom:1px solid #E2E8F0; padding-bottom:10px; flex-wrap:wrap; gap:8px;">
+              <div>
+                <strong id="teacherMindmapModalTitle" style="color:#1E293B; font-size:1.1rem;">🧠 학생 소리 생각그물(마인드맵) 구조도</strong>
+                <span style="font-size:0.82rem; color:#64748B; margin-left:8px;">학생이 배치한 생각의 연결과 구조를 한눈에 확인할 수 있습니다.</span>
+              </div>
+              <div style="display:flex; gap:8px;">
+                <button class="btn btn-sm btn-primary" onclick="downloadCurrentStudentMindmapPng()">💾 PNG 이미지 다운로드</button>
+                <button class="btn btn-sm btn-white" onclick="closeTeacherMindmapModal()">닫기 ✖</button>
+              </div>
+            </div>
+            <div id="teacherMindmapModalContent" style="flex:1; overflow:auto; background:#F8FAFC; border:1px solid #CBD5E1; border-radius:10px; padding:14px; display:flex; align-items:center; justify-content:center; min-height:450px;">
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -2844,6 +2862,178 @@
 
     let currentModalStudentClass = '3-1';
     let currentModalStudentNum = 1;
+    let currentModalStudentMindNodes = [];
+    let currentModalStudentName = '';
+
+    // =========================================================
+    // 🧠 학생 마인드맵 SVG 그래픽 이미지 생성기 및 다운로드 함수
+    // =========================================================
+    function generateStudentMindMapSvgString(nodes, isFullView) {
+      if (!nodes || !nodes.length) {
+        return '<svg xmlns="http://www.w3.org/2000/svg" width="600" height="160" viewBox="0 0 600 160"><rect width="100%" height="100%" rx="8" fill="#F8FAFC" stroke="#E2E8F0"/><text x="300" y="80" text-anchor="middle" dominant-baseline="central" fill="#94A3B8" font-size="14" font-family="sans-serif">생각그물 기록이 없습니다.</text></svg>';
+      }
+
+      // 1. 노드 바운딩 박스 계산
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      nodes.forEach(n => {
+        const x = (typeof n.x === 'number' && !isNaN(n.x)) ? n.x : 400;
+        const y = (typeof n.y === 'number' && !isNaN(n.y)) ? n.y : 200;
+        const w = (n.id === 'root' || n.type === 'root') ? 180 : Math.max(90, Math.min(220, ((n.text || '').length) * 13 + 32));
+        const h = 50;
+        if (x < minX) minX = x;
+        if (y < minY) minY = y;
+        if (x + w > maxX) maxX = x + w;
+        if (y + h > maxY) maxY = y + h;
+      });
+
+      const padX = 60;
+      const padY = 50;
+      const contentW = Math.max(10, maxX - minX);
+      const contentH = Math.max(10, maxY - minY);
+      const vbW = Math.max(780, contentW + padX * 2);
+      const vbH = Math.max(460, contentH + padY * 2);
+      const vbX = minX - (vbW - contentW) / 2;
+      const vbY = minY - (vbH - contentH) / 2;
+
+      // 2. 연결선(Lines) 생성
+      const root = nodes.find(n => n.id === 'root') || nodes[0];
+      let linesSvg = '';
+      nodes.forEach(n => {
+        if (n.id !== root.id) {
+          const parent = nodes.find(p => p.id === (n.parentId || 'root')) || root;
+          const isDirectToRoot = (parent.id === root.id);
+
+          const px = ((typeof parent.x === 'number' && !isNaN(parent.x)) ? parent.x : 400) + 65;
+          const py = ((typeof parent.y === 'number' && !isNaN(parent.y)) ? parent.y : 200) + 24;
+          const cx = ((typeof n.x === 'number' && !isNaN(n.x)) ? n.x : 400) + 55;
+          const cy = ((typeof n.y === 'number' && !isNaN(n.y)) ? n.y : 200) + 20;
+
+          const stroke = isDirectToRoot ? '#4F46E5' : '#0D9488';
+          const strokeWidth = isDirectToRoot ? '3' : '2.2';
+          const strokeDash = (n.type === 'item') ? 'stroke-dasharray="4,4"' : '';
+
+          linesSvg += `<line x1="${px}" y1="${py}" x2="${cx}" y2="${cy}" stroke="${stroke}" stroke-width="${strokeWidth}" ${strokeDash} stroke-linecap="round" />`;
+        }
+      });
+
+      // 3. 노드(Nodes) 박스 & 텍스트 생성
+      let nodesSvg = '';
+      nodes.forEach(n => {
+        const isRoot = (n.id === 'root' || n.type === 'root');
+        const isCategory = (n.type === 'category');
+        const rawTxt = n.text || '';
+        const txtLen = rawTxt.length;
+        const boxW = isRoot ? Math.max(150, Math.min(260, txtLen * 14 + 36)) : Math.max(90, Math.min(220, txtLen * 11 + 28));
+        const boxH = isRoot ? 48 : 38;
+        const rx = isRoot ? 24 : 18;
+
+        let fill = '#FFFFFF';
+        let stroke = '#4F46E5';
+        let strokeW = '2';
+        let textFill = '#1E293B';
+        let fontSize = isRoot ? '15' : '13';
+        let fontWeight = isRoot ? '800' : '700';
+
+        if (isRoot) {
+          fill = '#4F46E5';
+          stroke = '#312E81';
+          strokeW = '3';
+          textFill = '#FFFFFF';
+        } else if (isCategory) {
+          fill = '#CCFBF1';
+          stroke = '#0D9488';
+          textFill = '#115E59';
+        } else {
+          fill = '#FEF3C7';
+          stroke = '#D97706';
+          textFill = '#78350F';
+          fontWeight = '600';
+        }
+
+        const nx = (typeof n.x === 'number' && !isNaN(n.x)) ? n.x : 400;
+        const ny = (typeof n.y === 'number' && !isNaN(n.y)) ? n.y : 200;
+
+        nodesSvg += `
+          <g transform="translate(${nx}, ${ny})" filter="url(#nodeShadow)">
+            <rect width="${boxW}" height="${boxH}" rx="${rx}" fill="${fill}" stroke="${stroke}" stroke-width="${strokeW}" />
+            <text x="${boxW / 2}" y="${boxH / 2 + (isRoot ? 1 : 0)}" text-anchor="middle" dominant-baseline="central" fill="${textFill}" font-size="${fontSize}" font-weight="${fontWeight}" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Apple SD Gothic Neo, sans-serif">${escHtml(rawTxt)}</text>
+          </g>
+        `;
+      });
+
+      const maxHeightStyle = isFullView ? 'max-height:75vh;' : 'max-height:380px;';
+
+      return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${vbX} ${vbY} ${vbW} ${vbH}" style="width:100%; height:auto; ${maxHeightStyle} display:block; background:#F8FAFC; border-radius:8px;">
+        <defs>
+          <filter id="nodeShadow" x="-20%" y="-20%" width="140%" height="140%">
+            <feDropShadow dx="0" dy="2.5" stdDeviation="3" flood-opacity="0.12" />
+          </filter>
+        </defs>
+        <rect x="${vbX}" y="${vbY}" width="${vbW}" height="${vbH}" fill="#F8FAFC" />
+        ${linesSvg}
+        ${nodesSvg}
+      </svg>`;
+    }
+
+    function generateStudentMindMapSvg(nodes, isFullView) {
+      return generateStudentMindMapSvgString(nodes, isFullView);
+    }
+
+    function openTeacherMindmapModal() {
+      const modal = document.getElementById('teacherMindmapModal');
+      const title = document.getElementById('teacherMindmapModalTitle');
+      const content = document.getElementById('teacherMindmapModalContent');
+      if (!modal || !content) return;
+
+      title.textContent = `🧠 [${currentModalStudentClass} ${currentModalStudentNum}번 ${currentModalStudentName || '이름 없음'}] 학생의 소리 생각그물(마인드맵) 구조도`;
+      content.innerHTML = generateStudentMindMapSvg(currentModalStudentMindNodes, true);
+      modal.style.display = 'flex';
+    }
+
+    function closeTeacherMindmapModal() {
+      const modal = document.getElementById('teacherMindmapModal');
+      if (modal) modal.style.display = 'none';
+    }
+
+    function downloadCurrentStudentMindmapPng() {
+      if (!currentModalStudentMindNodes || !currentModalStudentMindNodes.length) {
+        alert('다운로드할 마인드맵 데이터가 없습니다.');
+        return;
+      }
+      const svgStr = generateStudentMindMapSvgString(currentModalStudentMindNodes, true);
+      const filename = `${currentModalStudentClass}_${currentModalStudentNum}번_${currentModalStudentName || '학생'}_소리마인드맵.png`;
+
+      const img = new Image();
+      const svgBlob = new Blob([svgStr], { type: 'image/svg+xml;charset=utf-8' });
+      const url = URL.createObjectURL(svgBlob);
+
+      img.onload = function() {
+        const canvas = document.createElement('canvas');
+        const scale = 2; // 2배율 고해상도 선명한 렌더링
+        const w = (img.width || 800);
+        const h = (img.height || 500);
+        canvas.width = w * scale;
+        canvas.height = h * scale;
+        const ctx = canvas.getContext('2d');
+        ctx.scale(scale, scale);
+        ctx.fillStyle = '#FFFFFF';
+        ctx.fillRect(0, 0, w, h);
+        ctx.drawImage(img, 0, 0, w, h);
+        URL.revokeObjectURL(url);
+
+        canvas.toBlob(function(blob) {
+          if (!blob) return;
+          const dlUrl = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = dlUrl;
+          a.download = filename;
+          a.click();
+          URL.revokeObjectURL(dlUrl);
+          showToast('📸 마인드맵 이미지가 PNG로 저장되었습니다!');
+        }, 'image/png');
+      };
+      img.src = url;
+    }
 
     function showStudentDetailModal(cls, num, student) {
       const modal = document.getElementById('teacherStudentDetailModal');
@@ -2853,6 +3043,9 @@
       currentModalStudentClass = cls;
       currentModalStudentNum = num;
       currentModalStudentId = cls + '_' + num;
+      currentModalStudentMindNodes = (student && student.mindNodes) || [];
+      currentModalStudentName = (student && student.name) || '';
+
       title.textContent = '📋 ' + cls + ' ' + num + '번 ' + ((student && student.name) || '이름 없음') + ' 학생 포트폴리오 (실시간)';
 
       const badge = document.getElementById('modalStudentCurrentBadge');
@@ -2901,10 +3094,13 @@
         }
         lessonsHtml += '</div>';
 
-        let mindHtml = '<span style="color:#94A3B8;">(생각그물 기록 없음)</span>';
-        if (student.mindNodes && student.mindNodes.length) {
-          mindHtml = '<ol style="font-size:0.85rem; margin:6px 0 0 18px;">' + student.mindNodes.map(function(n){ return '<li>' + escHtml(n.text || '') + '</li>'; }).join('') + '</ol>';
+        // 🧠 마인드맵 시각화 이미지 뷰어 구성
+        const hasMindNodes = student.mindNodes && student.mindNodes.length > 0;
+        let mindSvgPreview = '<div style="padding:16px; text-align:center; color:#94A3B8; font-size:0.85rem;">아직 저장된 생각그물이 없습니다.</div>';
+        if (hasMindNodes) {
+          mindSvgPreview = generateStudentMindMapSvg(student.mindNodes, false);
         }
+
         let slowHtml = '<span style="color:#94A3B8;">(쉬운모드 기록 없음)</span>';
         if (student.slowData && Object.keys(student.slowData).length) {
           slowHtml = '<div style="font-size:0.85rem;">' + Object.keys(student.slowData).sort().map(function(k){
@@ -2919,7 +3115,31 @@
             '<span>최근 저장: ' + (student.updatedAt ? escHtml(new Date(student.updatedAt).toLocaleString()) : '-') + '</span>' +
           '</div>' +
           '<div style="margin-bottom:14px;"><strong>[1~14차시 작성 내용 모아보기 — 있는 그대로]</strong>' + lessonsHtml + '</div>' +
-          '<div style="margin-bottom:14px;"><strong>[🧠 생각그물 원문 ' + ((student.mindNodes && student.mindNodes.length) || 0) + '개]</strong><br>' + mindHtml + '</div>' +
+
+          // 🧠 마인드맵 구조도 이미지 뷰어 카드
+          '<div style="margin-bottom:16px; background:#F8FAFC; border:1px solid #CBD5E1; border-radius:10px; padding:12px;">' +
+            '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; flex-wrap:wrap; gap:8px;">' +
+              '<div>' +
+                '<strong style="color:#312E81; font-size:0.95rem;">[🧠 생각그물(마인드맵) 구조도 - 노드 ' + (hasMindNodes ? student.mindNodes.length : 0) + '개]</strong>' +
+                '<span style="font-size:0.78rem; color:#64748B; margin-left:6px;">학생이 배치한 생각의 위치와 연결 구조를 확인합니다.</span>' +
+              '</div>' +
+              '<div style="display:flex; gap:6px;">' +
+                (hasMindNodes ? '<button type="button" class="btn btn-sm btn-outline" onclick="openTeacherMindmapModal()" style="font-size:0.78rem;">🔍 큰 화면으로 보기</button><button type="button" class="btn btn-sm btn-primary" onclick="downloadCurrentStudentMindmapPng()" style="font-size:0.78rem;">💾 PNG 다운로드</button>' : '') +
+              '</div>' +
+            '</div>' +
+            '<div style="background:#F5F3FF; border:1.5px dashed #C4B5FD; border-radius:8px; overflow:hidden; padding:4px; box-shadow:inset 0 1px 3px rgba(0,0,0,0.05); cursor:pointer;" onclick="' + (hasMindNodes ? 'openTeacherMindmapModal()' : '') + '" title="' + (hasMindNodes ? '클릭하면 큰 화면으로 확대됩니다' : '') + '">' +
+              mindSvgPreview +
+            '</div>' +
+            (hasMindNodes ? (
+              '<details style="margin-top:8px; font-size:0.82rem; color:#475569;">' +
+                '<summary style="cursor:pointer; font-weight:700; color:#4338CA;">📋 텍스트 목록으로 펼쳐보기</summary>' +
+                '<ol style="margin:6px 0 0 18px; line-height:1.6;">' +
+                  student.mindNodes.map(function(n){ return '<li>' + escHtml(n.text || '') + (n.type === 'root' ? ' <strong>(중심)</strong>' : '') + '</li>'; }).join('') +
+                '</ol>' +
+              '</details>'
+            ) : '') +
+          '</div>' +
+
           '<div style="margin-bottom:14px;"><strong>[🌱 쉬운모드 원문]</strong><br>' + slowHtml + '</div>' +
           '<div style="margin-bottom:14px;"><strong>[사운드 디자이너 작품]</strong><br>' +
             (student.projectAudio ? '<div style="margin: 8px 0;"><p style="font-size:0.8rem; font-weight:700; color:#16A34A;">🎧 학생 녹음 소리 재생:</p><audio src="' + student.projectAudio + '" controls style="max-width:100%;"></audio></div>' : '<span style="color:#94A3B8;">(녹음된 소리 없음)</span><br>') +
@@ -3241,12 +3461,14 @@
               rows += '<tr><td><strong>' + c + '차시</strong></td><td>' + escHtml((L && (L.observation || L.kwlK)) || '-') + '</td><td>' + escHtml((L && (L.lifeExample || L.kwlW)) || '-') + '</td><td>' + escHtml((L && L.thought) || '-') + '</td></tr>';
             }
             const mindAll = escHtml((d.mindNodes || []).map(function(n){ return n.text || ''; }).join(' → ')) || '-';
+            const hasMind = d.mindNodes && d.mindNodes.length > 0;
+            const mindSvgReport = hasMind ? '<div style="margin:8px 0; background:#F8FAFC; border:1px solid #CBD5E1; border-radius:6px; padding:6px; max-width:760px;">' + generateStudentMindMapSvgString(d.mindNodes, false) + '</div>' : '<p style="color:#94A3B8;">(생각그물 기록 없음)</p>';
             const slowAll = d.slowData ? escHtml(Object.keys(d.slowData).sort().map(function(k){ const s=d.slowData[k]; return '['+k+'단계 '+(s.lessonRef||'')+'] '+(s.choices||[]).join(',')+' / '+(s.trace||'')+' / '+(s.stamp||''); }).join(' | ')) : '-';
             reportHtml +=
               '<div class="student-card">' +
                 '<h3>' + escHtml(cls) + ' ' + i + '번 ' + escHtml(d.name || '이름 없음') + ' (작성 누적: ' + filled + '개 차시)</h3>' +
                 '<table><thead><tr><th>차시</th><th>관찰·K</th><th>사례·W</th><th>소감·다짐</th></tr></thead><tbody>' + rows + '</tbody></table>' +
-                '<p><strong>🧠 생각그물 원문:</strong> ' + mindAll + '</p>' +
+                '<div style="margin:10px 0;"><strong>🧠 생각그물(마인드맵) 구조도:</strong>' + mindSvgReport + '<p style="font-size:11px; color:#64748B; margin-top:4px;">• 텍스트 연결: ' + mindAll + '</p></div>' +
                 '<p><strong>🌱 쉬운모드 원문:</strong> ' + (slowAll || '-') + '</p>' +
                 '<p><strong>마무리 글쓰기:</strong></p><ul>' +
                   '<li>배운 원리: ' + escHtml((d.reflection && d.reflection.learn) || '-') + '</li>' +
